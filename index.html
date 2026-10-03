@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Draw Pinball</title>
+  <meta name="description" content="핀볼로 순위를 정하는 추첨 도구. 광고 없음.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%23ff5d8f'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="top">
+    <h1>Draw Pinball</h1>
+    <p>핀볼이 장애물을 지나 떨어지는 순서로 순위를 정합니다.</p>
+  </header>
+
+  <main class="layout">
+    <section class="panel" id="panel">
+      <h2>1. Enter names</h2>
+      <textarea id="names" rows="7" spellcheck="false" placeholder="No1, No2, No3&#10;이름*3 처럼 쓰면 같은 이름의 공이 3개"></textarea>
+      <p class="hint">쉼표 또는 줄바꿈으로 구분. <code>이름*3</code> → 같은 이름 공 3개 (최대 200개)</p>
+      <div class="row">
+        <span id="count" class="badge">0 balls</span>
+        <button type="button" id="shuffle" class="ghost">Shuffle list</button>
+      </div>
+      <p id="warn" class="warn" role="status"></p>
+
+      <h2>2. Winner</h2>
+      <div class="seg" role="radiogroup" aria-label="Winner mode">
+        <label><input type="radio" name="mode" value="first" checked><span>First</span></label>
+        <label><input type="radio" name="mode" value="last"><span>Last</span></label>
+        <label><input type="radio" name="mode" value="multiple"><span>Multiple</span></label>
+      </div>
+      <p class="hint" id="modeHint"></p>
+      <div id="rangeWrap" hidden>
+        <label class="field">Ranks
+          <input id="ranges" type="text" value="1-3" placeholder="예: 1-3, 7, 10~12" autocomplete="off">
+        </label>
+        <p class="hint">순번을 쉼표로 구분, 범위는 <code>1-3</code> 또는 <code>1~3</code></p>
+      </div>
+
+      <h2>3. Recording</h2>
+      <label class="check"><input type="checkbox" id="record"><span>Start 시 녹화하고 결과 발표 후 영상(.webm) 저장</span></label>
+      <p id="recNote" class="hint"></p>
+      <div id="recLink"></div>
+
+      <h2>Options</h2>
+      <div class="two">
+        <label class="field">Speed
+          <select id="speed">
+            <option value="1">1×</option>
+            <option value="2">2×</option>
+            <option value="4">4×</option>
+            <option value="8">8×</option>
+          </select>
+        </label>
+        <label class="field">Camera
+          <select id="camera">
+            <option value="auto">Follow</option>
+            <option value="full">Full map</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button type="button" id="start" class="primary">Start</button>
+        <button type="button" id="newmap" class="ghost">New map</button>
+      </div>
+    </section>
+
+    <section class="stage">
+      <canvas id="stage" width="720" height="1200" aria-label="Pinball stage"></canvas>
+    </section>
+
+    <aside class="panel board">
+      <h2>Results</h2>
+      <div id="winners" class="winners" aria-live="polite"></div>
+      <ol id="order" class="order"></ol>
+      <p id="empty" class="hint">Start를 누르면 도착 순서가 여기에 쌓입니다.</p>
+    </aside>
+  </main>
+
+  <script src="js/engine.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
