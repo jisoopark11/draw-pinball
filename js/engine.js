@@ -104,19 +104,119 @@
     const colliders = [];
     const dynamic = [];
     const add = c => { colliders.push(c); return c; };
+    const zones = [];
+    const portals = [];
+    const E_shuffle = a => shuffle(a, rng);
+
+    function spinner(cx, cy, hl, w, ang0, r) {
+      const s = add(seg(cx - hl, cy, cx + hl, cy, r, 0.6, { type: 'spinner', w, cx, cy, hl, ang0 }));
+      s.update = function (t) {
+        const a = this.ang0 + this.w * t, c = Math.cos(a) * this.hl, sn = Math.sin(a) * this.hl;
+        this.x1 = this.cx - c; this.y1 = this.cy - sn; this.x2 = this.cx + c; this.y2 = this.cy + sn;
+      };
+      s.update(0);
+      dynamic.push(s);
+      return s;
+    }
+    // door that blocks balls while closed and lets them through while open
+    function gate(x0, x1, y, period, open) {
+      const g = add(seg(x0, y, x1, y, 4, 0.3, { type: 'gate', off: false, period, open, phase: R(0, period) }));
+      g.update = function (t) { this.off = ((t + this.phase) % this.period) < this.period * this.open; };
+      g.update(0);
+      dynamic.push(g);
+      return g;
+    }
+    // region that pushes balls while "on"
+    function zone(x0, y0, x1, y1, ax, ay, period, duty) {
+      const z = { x0, y0, x1, y1, ax, ay, period, duty, phase: R(0, period), on: true };
+      z.update = function (t) { this.on = ((t + this.phase) % this.period) < this.period * this.duty; };
+      z.update(0);
+      zones.push(z);
+      return z;
+    }
 
     const builders = {
       pegs(y) {
-        const rows = 3 + Math.floor(rng() * 2);
-        const gap = 56, sp = 62;
+        const big = rng() < 0.3;              // sparse big pegs vs dense small pegs
+        const rows = big ? 3 : 3 + Math.floor(rng() * 2);
+        const gap = big ? 70 : 56, sp = big ? 92 : 62;
         for (let row = 0; row < rows; row++) {
           const off = row % 2 ? sp / 2 : 0;
           for (let x = off + sp / 2; x < W - 16; x += sp) {
             if (rng() < 0.08) continue;
-            add(circle(x + R(-6, 6), y + 20 + row * gap + R(-5, 5), R(4, 6.5), 0.55, { type: 'peg' }));
+            const r = big ? R(8, 12) : R(4, 6.5);
+            add(circle(x + R(-6, 6), y + 22 + row * gap + R(-5, 5), r, big ? 0.7 : 0.55, { type: 'peg' }));
           }
         }
         return rows * gap + 30;
+      },
+      windmill(y) {
+        const cx = W / 2 + R(-60, 60), cy = y + 115, w = (rng() < 0.5 ? -1 : 1) * R(1.0, 2.0);
+        const a0 = R(0, 3);
+        spinner(cx, cy, 115, w, a0, 6);
+        spinner(cx, cy, 115, w, a0 + Math.PI / 2, 6);
+        for (const sx of [50, W - 50]) add(circle(sx + R(-10, 10), y + R(60, 170), R(6, 9), 0.7));
+        return 235;
+      },
+      lanes(y) {
+        const K = 3 + Math.floor(rng() * 2), lw = W / K, top = y + 24, LH = 300;
+        for (let i = 1; i < K; i++) {
+          add(seg(lw * i, top + 14, lw * i, top + LH, 4, 0.4, { type: 'bar' }));
+          add(circle(lw * i, top + 6, 7, 0.7, { type: 'bumper' }));
+        }
+        const all = ['free', 'zigzag', 'wind', 'gate'];
+        let types = E_shuffle(K === 3 ? ['free', 'zigzag', 'gate'] : all);
+        if (rng() < 0.4) types[1 + Math.floor(rng() * (K - 1))] = all[Math.floor(rng() * 4)];
+        types.forEach((tp, i) => {
+          const x0 = lw * i + 4, x1 = lw * (i + 1) - 4;
+          if (tp === 'zigzag') {
+            let left = rng() < 0.5; const L = (x1 - x0) * 0.66;
+            for (let k = 0; k < 3; k++) {
+              const yy = top + 50 + k * 80;
+              if (left) add(seg(x0, yy, x0 + L, yy + L * 0.26, 4, 0.4, { type: 'slope' }));
+              else add(seg(x1, yy, x1 - L, yy + L * 0.26, 4, 0.4, { type: 'slope' }));
+              left = !left;
+            }
+          } else if (tp === 'wind') {
+            zone(x0, top + 40, x1, top + LH - 20, 0, -GRAVITY * R(1.3, 2.0), R(2.5, 4.5), 0.5);
+          } else if (tp === 'gate') {
+            gate(x0, x1, top + LH - 30, R(3, 5), 0.4);
+          }
+        });
+        return LH + 90;
+      },
+      // three holes in a ridged floor; each hole is a portal: shortcut forward, sent back, or plain pass-through
+      portals(y) {
+        const K = 3, hw = 30, lip = y + 130, peak = y + 85;
+        const kinds = E_shuffle(['fwd', 'back', 'stay']);
+        const hc = [];
+        for (let i = 0; i < K; i++) hc.push(W * (i + 0.5) / K + R(-25, 25));
+        const sl = (x1, y1, x2, y2) => add(seg(x1, y1, x2, y2, 4, 0.4, { type: 'slope' }));
+        sl(0, peak, hc[0] - hw, lip);
+        for (let i = 0; i < K - 1; i++) {
+          const xm = (hc[i] + hw + hc[i + 1] - hw) / 2;
+          sl(hc[i] + hw, lip, xm, peak); sl(xm, peak, hc[i + 1] - hw, lip);
+        }
+        sl(hc[K - 1] + hw, lip, W, peak);
+        hc.forEach((c, i) => portals.push({ x0: c - hw + 6, x1: c + hw - 6, y0: lip, y1: lip + 50, cx: c, cy: lip + 14, kind: kinds[i], destY: 0 }));
+        return 200;
+      },
+      gates(y) {
+        for (let i = 0; i < 3; i++) gate(W / 3 * i, W / 3 * (i + 1), y + 30, R(3, 5.5), R(0.35, 0.5));
+        for (let row = 0; row < 2; row++) {
+          for (let x = 40 + row * 30; x < W - 20; x += 60) add(circle(x + R(-6, 6), y + 80 + row * 50, R(4, 6), 0.55));
+        }
+        return 190;
+      },
+      wind(y) {
+        const up = rng() < 0.5, h = 230;
+        const period = R(2.5, 4), duty = R(0.45, 0.6);
+        if (up) zone(0, y, W, y + h, 0, -GRAVITY * R(1.4, 2.2), period, duty);
+        else zone(0, y, W, y + h, (rng() < 0.5 ? -1 : 1) * R(500, 900), 0, period, duty);
+        for (let row = 0; row < 3; row++) {
+          for (let x = (row % 2 ? 30 : 0) + 45; x < W - 20; x += 80) add(circle(x + R(-8, 8), y + 40 + row * 70 + R(-6, 6), R(4, 6), 0.55));
+        }
+        return h + 30;
       },
       spinners(y) {
         const cnt = 2 + Math.floor(rng() * 2);
@@ -126,13 +226,7 @@
           const cy = y + 60 + R(-8, 8);
           const hl = spacing * 0.375;
           const w = (rng() < 0.5 ? -1 : 1) * R(1.4, 3.2);
-          const s = add(seg(cx - hl, cy, cx + hl, cy, 5, 0.6, { type: 'spinner', w, cx, cy, hl, ang0: R(0, Math.PI) }));
-          s.update = function (t) {
-            const a = this.ang0 + this.w * t, c = Math.cos(a) * this.hl, sn = Math.sin(a) * this.hl;
-            this.x1 = this.cx - c; this.y1 = this.cy - sn; this.x2 = this.cx + c; this.y2 = this.cy + sn;
-          };
-          s.update(0);
-          dynamic.push(s);
+          spinner(cx, cy, hl, w, R(0, Math.PI), 5);
         }
         return 125;
       },
@@ -185,22 +279,38 @@
       }
     };
 
-    const pool = ['pegs', 'pegs', 'pegs', 'spinners', 'spinners', 'slopes', 'bumpers', 'sliders', 'funnel'];
-    const bandCount = 13 + Math.floor(rng() * 4);
+    // "lottery" bands make travel time vary wildly between balls, so ranks keep reshuffling
+    const lottery = ['lanes', 'gates', 'wind'];
+    const pool = ['pegs', 'pegs', 'spinners', 'windmill', 'slopes', 'bumpers', 'sliders', 'funnel'].concat(lottery, lottery);
+    const bandCount = 11 + Math.floor(rng() * 4);
+    const mid = Math.floor(bandCount * 0.55), late = Math.floor(bandCount * 0.78);
     let y = SPAWN_H + 90;
     let last = '';
     const layout = [];
     for (let i = 0; i < bandCount; i++) {
-      let type;
-      do { type = i === 0 ? 'pegs' : pool[Math.floor(rng() * pool.length)]; }
-      while (type === last && type !== 'pegs');
-      if (type === 'pegs' && last === 'pegs' && rng() < 0.5) continue;
+      let src = pool;
+      if (i === 0) src = ['pegs'];
+      else if (i === mid || i === bandCount - 1) src = ['portals'];          // decisive: shortcut / sent back / pass
+      else if (i === Math.floor(bandCount * 0.3) || i === late) src = lottery;
+      let cand = src.filter(t => t !== last || t === 'pegs');
+      if (!cand.length) cand = ['pegs'];
+      const type = cand[Math.floor(rng() * cand.length)];
       layout.push({ type, y });
+      const before = portals.length;
       y += builders[type](y);
+      for (let k = before; k < portals.length; k++) portals[k].band = i;
       last = type;
     }
     const finishY = y + 110;
-    return { W, H: finishY + 190, SPAWN_H, finishY, colliders, dynamic, layout, seed };
+    for (const p of portals) {
+      const j = p.band, lastIdx = layout.length - 1;
+      if (p.kind === 'fwd') {
+        p.destY = j >= lastIdx ? finishY - 70 : layout[Math.min(lastIdx, j + 2 + Math.floor(rng() * 2))].y - 14;
+      } else if (p.kind === 'back') {
+        p.destY = layout[Math.max(0, j - 3 - Math.floor(rng() * 2))].y - 14;
+      }
+    }
+    return { W, H: finishY + 190, SPAWN_H, finishY, colliders, dynamic, zones, portals, layout, seed };
   }
 
   // ---------- game ----------
@@ -247,7 +357,7 @@
           x: x0 + (s % cols) * cell + (this.rng() - 0.5) * 2,
           y: y0 + Math.floor(s / cols) * cell + (this.rng() - 0.5) * 2,
           vx: (this.rng() - 0.5) * 120, vy: this.rng() * 40,
-          done: false, rank: 0, time: 0, stuck: 0, doneAt: 0
+          done: false, rank: 0, time: 0, stuck: 0, doneAt: 0, cd: 0, backs: 0, tele: null
         };
       });
       this.active = this.balls.slice();
@@ -266,11 +376,15 @@
       const map = this.map;
       this.t += dt;
       for (const c of map.dynamic) c.update(this.t);
+      for (const z of map.zones) z.update(this.t);
 
       const A = this.active;
       const k = 1 - DRAG * dt;
       for (const b of A) {
         b.vy += GRAVITY * dt;
+        for (const z of map.zones) {
+          if (z.on && b.y > z.y0 && b.y < z.y1 && b.x > z.x0 && b.x < z.x1) { b.vx += z.ax * dt; b.vy += z.ay * dt; }
+        }
         b.vx *= k; b.vy *= k;
         const sp2 = b.vx * b.vx + b.vy * b.vy;
         if (sp2 > MAX_SPEED * MAX_SPEED) {
@@ -298,6 +412,22 @@
           }
         }
         for (const b of A) this._collideWorld(b);
+      }
+
+      // portals
+      if (map.portals.length) {
+        for (const b of A) {
+          if (b.cd > 0) { b.cd -= dt; continue; }
+          for (const p of map.portals) {
+            if (b.x < p.x0 || b.x > p.x1 || b.y < p.y0 || b.y > p.y1) continue;
+            if (p.kind === 'stay' || (p.kind === 'back' && b.backs >= 2)) break;
+            b.tele = { t: this.t, x: b.x, y: b.y };
+            if (p.kind === 'back') b.backs++;
+            b.x = 40 + this.rng() * (W - 80); b.y = p.destY;
+            b.vx = (this.rng() - 0.5) * 120; b.vy = 40; b.cd = 0.6; b.stuck = 0;
+            break;
+          }
+        }
       }
 
       // finish + stuck handling
@@ -330,8 +460,9 @@
       const cols = this.map.buckets[Math.max(0, Math.floor(b.y / BUCKET))];
       if (!cols) return;
       for (let i = 0; i < cols.length; i++) {
+        if (cols[i].off) continue;
         if (collideCollider(b, cols[i])) {
-          b.vx += (this.rng() - 0.5) * 14; // tiny chaos on every bounce
+          b.vx += (this.rng() - 0.5) * 40; b.vy += (this.rng() - 0.5) * 20; // chaos on every bounce
         }
       }
     }

@@ -118,3 +118,7 @@ canvas {
   canvas { height: min(75vh, 900px); }
   .board { position: static; max-height: none; }
 }
+
+.mini { margin-bottom: 12px; }
+.mini canvas { width: 100%; height: auto; aspect-ratio: auto; border-radius: 8px; background: #0b0c12; border: 1px solid var(--line); display: block; }
+.seg input:disabled { opacity: 0; }
