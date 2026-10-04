@@ -301,11 +301,11 @@
     }
   }
 
-  const PORTAL = { fwd: ['#4cff9a', 'SKIP'], back: ['#ff5d5d', 'BACK'], stay: ['#6ab7ff', 'PASS'] };
+  const PORTAL = { fwd: '#4cff9a', back: '#ff5d5d', stay: '#6ab7ff' };
   function drawPortals(v, now) {
     for (const p of map.portals) {
       if (p.y1 < v.top - 40 || p.y0 > v.bottom + 40) continue;
-      const [col, label] = PORTAL[p.kind];
+      const col = PORTAL[p.kind];
       const hw = (p.x1 - p.x0) / 2 + 6, ang = now / 1000 * (p.kind === 'back' ? -3 : 3);
       ctx.save();
       ctx.translate(p.cx, p.y0 + 8);
@@ -317,22 +317,30 @@
         ctx.beginPath(); ctx.ellipse(0, 0, hw - k * 4, 12 - k * 2.5, 0, a0, a0 + 1.5); ctx.stroke();
       }
       ctx.restore();
-      ctx.fillStyle = col; ctx.globalAlpha = 0.85; ctx.font = '700 11px system-ui, sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText(label, p.cx, p.y0 + 34); ctx.globalAlpha = 1;
     }
   }
 
   function drawSlams(v, now) {
     for (const sl of map.slams) {
       if (sl.y1 < v.top - 20 || sl.y0 > v.bottom + 20) continue;
-      const pulse = 0.5 + 0.5 * Math.sin(now / 250);
+      const h = sl.y1 - sl.y0, pulse = 0.5 + 0.5 * Math.sin(now / 250);
       ctx.fillStyle = `rgba(255,70,70,${0.10 + 0.07 * pulse})`;
-      ctx.fillRect(0, sl.y0, map.W, sl.y1 - sl.y0);
+      ctx.fillRect(0, sl.y0, map.W, h);
       ctx.strokeStyle = 'rgba(255,90,90,.75)'; ctx.lineWidth = 2; ctx.setLineDash([10, 8]);
       ctx.beginPath(); ctx.moveTo(0, sl.y0); ctx.lineTo(map.W, sl.y0); ctx.moveTo(0, sl.y1); ctx.lineTo(map.W, sl.y1); ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = 'rgba(255,120,120,.9)'; ctx.font = '800 13px system-ui, sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('▲ LEADERS BACK ▲', map.W / 2, (sl.y0 + sl.y1) / 2 + 5);
+      // chevrons rising through the strip
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, sl.y0, map.W, h); ctx.clip();
+      ctx.strokeStyle = 'rgba(255,130,130,.8)'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      const rise = (now / 1000 * 40) % h;
+      for (let x = 30; x < map.W; x += 60) {
+        for (let k = 0; k < 2; k++) {
+          const cy = sl.y1 + 6 - rise - k * h;
+          ctx.beginPath(); ctx.moveTo(x - 10, cy + 6); ctx.lineTo(x, cy - 5); ctx.lineTo(x + 10, cy + 6); ctx.stroke();
+        }
+      }
+      ctx.restore();
     }
   }
 
