@@ -8,6 +8,11 @@ assert.deepStrictEqual(E.parseEntries('A * 2, B*0').balls, ['A', 'A']);
 assert.deepStrictEqual(E.parseRanges('1-3, 5, 8~10, 99', 10), [1, 2, 3, 5, 8, 9, 10]);
 assert.deepStrictEqual(E.winnerRanks('last', '', 7), [7]);
 
+// grouping: 13 balls, 3 groups, dealt out round-robin by rank
+const grp = E.buildGroups(Array.from({ length: 13 }, (_, i) => i), 3).map(g => g.map(m => m.rank));
+assert.deepStrictEqual(grp, [[1, 4, 7, 10, 13], [2, 5, 8, 11], [3, 6, 9, 12]]);
+assert.strictEqual(E.groupOf(7, 3), 1);
+
 // simulation
 let worst = 0;
 for (const n of [2, 6, 30, 100, 200]) {

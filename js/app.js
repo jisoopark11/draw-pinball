@@ -13,7 +13,7 @@
 
   const els = {
     names: $('names'), count: $('count'), warn: $('warn'), shuffle: $('shuffle'),
-    ranges: $('ranges'), rangeWrap: $('rangeWrap'),
+    ranges: $('ranges'), rangeWrap: $('rangeWrap'), groups: $('groups'), groupWrap: $('groupWrap'),
     record: $('record'), recLink: $('recLink'),
     speed: $('speed'), camera: $('camera'), start: $('start'), newmap: $('newmap'),
     winners: $('winners'), order: $('order')
@@ -28,6 +28,7 @@
       const s = JSON.parse(localStorage.getItem(STORE) || '{}');
       if (typeof s.names === 'string') els.names.value = s.names;
       if (typeof s.ranges === 'string') els.ranges.value = s.ranges;
+      if (typeof s.groups === 'string') els.groups.value = s.groups;
       const m = modeInputs.find(i => i.value === s.mode);
       if (m) m.checked = true;
     } catch (e) { /* storage unavailable */ }
@@ -35,7 +36,7 @@
   }
   function saveSettings() {
     try {
-      localStorage.setItem(STORE, JSON.stringify({ names: els.names.value, ranges: els.ranges.value, mode: getMode() }));
+      localStorage.setItem(STORE, JSON.stringify({ names: els.names.value, ranges: els.ranges.value, groups: els.groups.value, mode: getMode() }));
     } catch (e) { /* ignore */ }
   }
 
@@ -44,6 +45,8 @@
   let game = null;
   let state = 'idle';            // idle | running | done
   let winnerSet = new Set();
+  let groupCount = 0;            // > 0 in Group mode
+  const groupHue = g => ((g - 1) * 360 / Math.max(groupCount, 1)) % 360;
   let doneAt = 0;                // performance.now() of completion
   let camTop = 0;
 
@@ -52,27 +55,33 @@
     const { balls, warnings } = E.parseEntries(els.names.value);
     const mode = getMode();
     const ranks = E.winnerRanks(mode, els.ranges.value, balls.length);
-    return { balls, warnings, mode, ranks };
+    const groups = parseInt(els.groups.value, 10);
+    const groupsOk = Number.isInteger(groups) && groups >= 2 && groups <= balls.length;
+    return { balls, warnings, mode, ranks, groups: mode === 'group' && groupsOk ? groups : 0, groupsOk };
   }
 
   function refreshInput() {
-    const { balls, warnings, mode, ranks } = currentInput();
+    const { balls, warnings, mode, ranks, groups, groupsOk } = currentInput();
     els.count.textContent = balls.length + (balls.length === 1 ? ' ball' : ' balls');
     els.rangeWrap.hidden = mode !== 'multiple';
+    els.groupWrap.hidden = mode !== 'group';
     const msgs = warnings.slice();
+    let invalid = balls.length < 2;
     if (balls.length < 2) msgs.push('2+ balls needed');
-    else if (mode === 'multiple' && !ranks.length) msgs.push(`Ranks: 1-${balls.length}`);
+    else if (mode === 'multiple' && !ranks.length) { msgs.push(`Ranks: 1-${balls.length}`); invalid = true; }
+    else if (mode === 'group' && !groupsOk) { msgs.push(`Groups: 2-${balls.length}`); invalid = true; }
     els.warn.textContent = msgs.join(' · ');
-    els.start.disabled = state === 'running' ? false : balls.length < 2 || (mode === 'multiple' && !ranks.length);
-    return { balls, mode, ranks };
+    els.start.disabled = state === 'running' ? false : invalid;
+    return { balls, mode, ranks, groups };
   }
 
   function lockInputs(locked) {
-    [els.names, els.shuffle, els.ranges, els.record, els.newmap, ...modeInputs].forEach(e => { e.disabled = locked; });
+    [els.names, els.shuffle, els.ranges, els.groups, els.record, els.newmap, ...modeInputs].forEach(e => { e.disabled = locked; });
   }
 
   els.names.addEventListener('input', () => { refreshInput(); saveSettings(); });
   els.ranges.addEventListener('input', () => { refreshInput(); saveSettings(); });
+  els.groups.addEventListener('input', () => { refreshInput(); saveSettings(); });
   modeInputs.forEach(i => i.addEventListener('change', () => { refreshInput(); saveSettings(); }));
 
   // Shuffle only re-rolls how the balls are arranged in the hopper; the typed list is left untouched.
@@ -99,12 +108,37 @@
     li.children[1].style.background = `hsl(${b.hue} 80% 58%)`;
     li.children[2].textContent = b.name;
     li.children[3].textContent = b.time.toFixed(1) + 's';
+    if (groupCount) {
+      const g = E.groupOf(b.rank, groupCount);
+      const pill = document.createElement('span');
+      pill.className = 'gp'; pill.textContent = 'G' + g; pill.style.color = `hsl(${groupHue(g)} 80% 65%)`;
+      li.insertBefore(pill, li.children[3]);
+    }
     els.order.appendChild(li);
     li.scrollIntoView({ block: 'nearest' });
   }
 
   function showWinners() {
     els.winners.innerHTML = '';
+    if (groupCount) {
+      E.buildGroups(game.ranking, groupCount).forEach((members, i) => {
+        const card = document.createElement('div');
+        card.className = 'card group';
+        const small = document.createElement('small');
+        small.textContent = `Group ${i + 1}`;
+        small.style.color = `hsl(${groupHue(i + 1)} 80% 65%)`;
+        card.appendChild(small);
+        for (const m of members) {
+          const line = document.createElement('span');
+          line.className = 'mem';
+          const rk = document.createElement('i'); rk.textContent = '#' + m.rank;
+          line.appendChild(rk); line.appendChild(document.createTextNode(m.ball.name));
+          card.appendChild(line);
+        }
+        els.winners.appendChild(card);
+      });
+      return;
+    }
     for (const rank of Array.from(winnerSet).sort((a, b) => a - b)) {
       const b = game.ranking[rank - 1];
       if (!b) continue;
@@ -161,11 +195,12 @@
       lockInputs(false); els.start.textContent = 'Start'; refreshInput();
       return;
     }
-    const { balls, ranks } = refreshInput();
+    const { balls, ranks, groups, mode } = refreshInput();
     if (els.start.disabled) return;
     if (state === 'done') map = E.createMap();   // fresh obstacles each round
     resetStage();
     winnerSet = new Set(ranks);
+    groupCount = mode === 'group' ? groups : 0;
     game = new E.Game(balls, map, arrangeSeed);
     arrangeSeed = E.randomSeed();
     state = 'running';
@@ -391,7 +426,44 @@
     return text.length * 16 > maxW ? text.slice(0, Math.floor(maxW / 16) - 1) + '…' : text;
   }
 
+  function fitText(text, maxW) {
+    if (ctx.measureText(text).width <= maxW) return text;
+    while (text.length > 1 && ctx.measureText(text + '…').width > maxW) text = text.slice(0, -1);
+    return text + '…';
+  }
+
+  function drawGroupBanner() {
+    const age = Math.min(1, (performance.now() - doneAt) / 500);
+    const groups = E.buildGroups(game.ranking, groupCount);
+    const shown = groups.slice(0, 7);
+    const rowH = 64, w = canvas.width * 0.88;
+    const h = 100 + shown.length * rowH + (groups.length > shown.length ? 40 : 0);
+    const x = (canvas.width - w) / 2, y = (canvas.height - h) / 2 - (1 - age) * 40;
+    ctx.save();
+    ctx.globalAlpha = age;
+    ctx.fillStyle = 'rgba(10,11,18,.9)'; ctx.strokeStyle = '#ffd24a'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 24); ctx.fill(); ctx.stroke();
+    ctx.textAlign = 'center'; ctx.fillStyle = '#ffd24a'; ctx.font = '800 32px system-ui, sans-serif';
+    ctx.fillText('GROUPS', canvas.width / 2, y + 56);
+    shown.forEach((members, i) => {
+      const cy = y + 112 + i * rowH;
+      const hue = groupHue(i + 1);
+      ctx.fillStyle = `hsl(${hue} 70% 45%)`;
+      ctx.beginPath(); ctx.roundRect(x + 22, cy - 34, 62, 44, 12); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = '800 24px system-ui, sans-serif';
+      ctx.fillText('G' + (i + 1), x + 53, cy - 4);
+      ctx.textAlign = 'left'; ctx.fillStyle = '#fff'; ctx.font = '700 24px system-ui, "Noto Sans KR", sans-serif';
+      ctx.fillText(fitText(members.map(m => m.ball.name).join(', '), w - 130), x + 100, cy - 4);
+    });
+    if (groups.length > shown.length) {
+      ctx.textAlign = 'center'; ctx.fillStyle = '#9aa0b8'; ctx.font = '600 22px system-ui, sans-serif';
+      ctx.fillText(`+${groups.length - shown.length} more`, canvas.width / 2, y + h - 20);
+    }
+    ctx.restore();
+  }
+
   function drawBanner() {
+    if (groupCount) return drawGroupBanner();
     const age = Math.min(1, (performance.now() - doneAt) / 500);
     const ranks = Array.from(winnerSet).sort((a, b) => a - b);
     const shown = ranks.slice(0, 8);
