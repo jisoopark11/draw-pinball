@@ -1,1 +1,34 @@
-# draw-pinball
+# Draw Pinball
+
+핀볼이 장애물을 지나 떨어지는 **도착 순서**로 순위/추첨을 정하는 웹 도구입니다.
+광고·외부 라이브러리·서버 없이 정적 파일(HTML/CSS/JS)만으로 동작합니다.
+
+## 사용법
+1. **Enter names** – 쉼표 또는 줄바꿈으로 구분. `No1*3`처럼 `*n`을 붙이면 같은 이름(같은 색)의 공이 n개 생깁니다 (최대 200개). `Shuffle`은 목록은 그대로 두고 시작 위치의 배치만 다시 섞습니다.
+2. **Winner** – `First` / `Last` / `Multiple`(예: `1-3, 7, 10~12`)
+3. **Recording** – 체크하면 Start와 함께 녹화하고, 결과 발표 후 `.webm`으로 저장합니다.
+4. **Start** – 시작 후에는 관여할 수 없습니다. 속도(1~8×)와 카메라(Follow / Full map)는 Options에서 고릅니다.
+5. 좌측 상단 미니맵은 전체 맵을 보여주며 현재 카메라 위치가 노란 영역으로 표시됩니다. 도착하면 우승자를 발표합니다.
+
+## 우연성
+- 시작 위치·초기 속도가 매번 랜덤, 충돌마다 무작위 요동
+- 라운드마다 맵 랜덤 생성: 페그, 풍차, 회전 바, 경사판, 범퍼, 슬라이더, 깔때기, 그리고 순위를 뒤섞는 구간
+  - **Lanes**: 차선마다 통과 시간이 크게 다름 (자유낙하 / 지그재그 / 상승기류 / 주기적으로 열리는 게이트)
+  - **Gates**: 일정 주기로 열리고 닫히는 문
+  - **Wind**: 시간에 따라 켜지고 꺼지는 상승/횡풍
+  - **Portals**: 구멍마다 SKIP(앞 구간으로 순간이동) / BACK(뒤로 되돌림, 최대 2회) / PASS
+- 중반 순위가 얼마나 바뀌는지는 `node tests/metrics.js`, `node tests/lead.js`로 측정할 수 있습니다.
+
+## 로컬 실행
+```
+python3 -m http.server 8000   # 후 http://localhost:8000
+node tests/sim.js             # 물리 엔진 헤드리스 테스트 (끼임/완주 확인)
+```
+
+## GitHub Pages 배포
+저장소 Settings → Pages → Source: `Deploy from a branch` → 브랜치 선택, 폴더 `/ (root)`.
+
+## 구조
+- `index.html`, `css/style.css`
+- `js/engine.js` – 물리/맵 생성/입력 파싱 (DOM 무관, Node에서도 실행)
+- `js/app.js` – UI, 렌더링, 카메라, 녹화
