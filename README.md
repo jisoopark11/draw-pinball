@@ -22,9 +22,11 @@
 
 ## 로컬 실행
 ```
-python3 -m http.server 8000   # 후 http://localhost:8000
+python3 serve.py 8000         # 캐시를 끈 로컬 서버, 후 http://localhost:8000
 node tests/sim.js             # 물리 엔진 헤드리스 테스트 (끼임/완주 확인)
 ```
+
+> 파일을 수정한 뒤 배포(GitHub Pages)할 때는 `index.html`의 `?v=` 숫자를 올리면 방문자의 브라우저 캐시가 갱신됩니다.
 
 ## GitHub Pages 배포
 저장소 Settings → Pages → Source: `Deploy from a branch` → 브랜치 선택, 폴더 `/ (root)`.
