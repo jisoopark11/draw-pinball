@@ -322,6 +322,20 @@
     }
   }
 
+  function drawSlams(v, now) {
+    for (const sl of map.slams) {
+      if (sl.y1 < v.top - 20 || sl.y0 > v.bottom + 20) continue;
+      const pulse = 0.5 + 0.5 * Math.sin(now / 250);
+      ctx.fillStyle = `rgba(255,70,70,${0.10 + 0.07 * pulse})`;
+      ctx.fillRect(0, sl.y0, map.W, sl.y1 - sl.y0);
+      ctx.strokeStyle = 'rgba(255,90,90,.75)'; ctx.lineWidth = 2; ctx.setLineDash([10, 8]);
+      ctx.beginPath(); ctx.moveTo(0, sl.y0); ctx.lineTo(map.W, sl.y0); ctx.moveTo(0, sl.y1); ctx.lineTo(map.W, sl.y1); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(255,120,120,.9)'; ctx.font = '800 13px system-ui, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('▲ LEADERS BACK ▲', map.W / 2, (sl.y0 + sl.y1) / 2 + 5);
+    }
+  }
+
   function drawTeleRing(x, y, age, col) {
     const k = age / 0.5;
     ctx.strokeStyle = col; ctx.globalAlpha = 1 - k; ctx.lineWidth = 3;
@@ -358,8 +372,9 @@
       ctx.globalAlpha = 1;
       if (b.tele && game.t - b.tele.t < 0.5) {
         const age = game.t - b.tele.t;
-        drawTeleRing(b.tele.x, b.tele.y, age, '#fff');
-        drawTeleRing(b.x, b.y, age, '#fff');
+        const col = b.tele.kind === 'slam' ? '#ff5a5a' : '#fff';
+        drawTeleRing(b.tele.x, b.tele.y, age, col);
+        drawTeleRing(b.x, b.y, age, col);
       }
     }
   }
@@ -451,6 +466,7 @@
       const v = { top: k * miniColH - 40, bottom: (k + 1) * miniColH + 40 };
       drawBackdrop(v);
       drawZones(v, 0);
+      drawSlams(v, 0);
       for (const col of map.colliders) drawCollider(col, v);
       drawPortals(v, 0);
       c.restore();
@@ -499,6 +515,7 @@
     ctx.setTransform(v.s, 0, 0, v.s, v.ox, v.oy);
     drawBackdrop(v);
     drawZones(v, now);
+    drawSlams(v, now);
     for (const c of map.colliders) drawCollider(c, v);
     drawPortals(v, now);
     if (game) drawBalls(v, v.s);
