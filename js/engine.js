@@ -106,6 +106,7 @@
     const add = c => { colliders.push(c); return c; };
     const zones = [];
     const portals = [];
+    const slams = [];
     const E_shuffle = a => shuffle(a, rng);
 
     function spinner(cx, cy, hl, w, ang0, r) {
@@ -117,6 +118,12 @@
       s.update(0);
       dynamic.push(s);
       return s;
+    }
+    function spinnerRow(cy, cnt) {
+      const spacing = W / cnt;
+      for (let k = 0; k < cnt; k++) {
+        spinner(spacing * (k + 0.5) + R(-10, 10), cy + R(-8, 8), spacing * 0.375, (rng() < 0.5 ? -1 : 1) * R(1.4, 3.2), R(0, Math.PI), 5);
+      }
     }
     // door that blocks balls while closed and lets them through while open
     function gate(x0, x1, y, period, open) {
@@ -201,6 +208,15 @@
         hc.forEach((c, i) => portals.push({ x0: c - hw + 6, x1: c + hw - 6, y0: lip, y1: lip + 50, cx: c, cy: lip + 14, kind: kinds[i], destY: 0 }));
         return 200;
       },
+      // pad that only reacts to the front-runners: they get knocked back up, everyone else passes through
+      slam(y) {
+        slams.push({ id: slams.length, y0: y + 36, y1: y + 70, frac: R(0.35, 0.5), destY: 0 });
+        if (rng() < 0.5) spinnerRow(y + 140, 3);
+        else for (let row = 0; row < 2; row++) {
+          for (let x = (row ? 35 : 0) + 45; x < W - 20; x += 70) add(circle(x + R(-7, 7), y + 115 + row * 52 + R(-5, 5), R(4, 6.5), 0.55));
+        }
+        return 215;
+      },
       gates(y) {
         for (let i = 0; i < 3; i++) gate(W / 3 * i, W / 3 * (i + 1), y + 30, R(3, 5.5), R(0.35, 0.5));
         for (let row = 0; row < 2; row++) {
@@ -213,25 +229,29 @@
         const period = R(2.5, 4), duty = R(0.45, 0.6);
         if (up) zone(0, y, W, y + h, 0, -GRAVITY * R(1.4, 2.2), period, duty);
         else zone(0, y, W, y + h, (rng() < 0.5 ? -1 : 1) * R(500, 900), 0, period, duty);
-        for (let row = 0; row < 3; row++) {
+        if (rng() < 0.5) spinnerRow(y + 115, 3);
+        else for (let row = 0; row < 3; row++) {
           for (let x = (row % 2 ? 30 : 0) + 45; x < W - 20; x += 80) add(circle(x + R(-8, 8), y + 40 + row * 70 + R(-6, 6), R(4, 6), 0.55));
         }
         return h + 30;
       },
       spinners(y) {
-        const cnt = 2 + Math.floor(rng() * 2);
-        const spacing = W / cnt;
-        for (let k = 0; k < cnt; k++) {
-          const cx = spacing * (k + 0.5) + R(-12, 12);
-          const cy = y + 60 + R(-8, 8);
-          const hl = spacing * 0.375;
-          const w = (rng() < 0.5 ? -1 : 1) * R(1.4, 3.2);
-          spinner(cx, cy, hl, w, R(0, Math.PI), 5);
+        const rows = rng() < 0.45 ? 2 : 1;                 // sometimes two staggered rows
+        for (let r = 0; r < rows; r++) {
+          const cnt = 2 + Math.floor(rng() * 2);
+          const spacing = W / cnt;
+          for (let k = 0; k < cnt; k++) {
+            const cx = spacing * (k + 0.5) + R(-12, 12);
+            const cy = y + 60 + r * 135 + R(-8, 8);
+            const hl = spacing * 0.375;
+            const w = (rng() < 0.5 ? -1 : 1) * R(1.4, 3.2);
+            spinner(cx, cy, hl, w, R(0, Math.PI), 5);
+          }
         }
-        return 125;
+        return 125 + (rows - 1) * 135;
       },
       slopes(y) {
-        const L = W * 0.7, drop = L * 0.2, step = 100;
+        const L = W * 0.66, drop = L * 0.3, step = 115;
         const n = 3;
         let left = rng() < 0.5;
         for (let i = 0; i < n; i++) {
@@ -281,27 +301,30 @@
 
     // "lottery" bands make travel time vary wildly between balls, so ranks keep reshuffling
     const lottery = ['lanes', 'gates', 'wind'];
-    const pool = ['pegs', 'pegs', 'spinners', 'windmill', 'slopes', 'bumpers', 'sliders', 'funnel'].concat(lottery, lottery);
-    const bandCount = 11 + Math.floor(rng() * 4);
-    const mid = Math.floor(bandCount * 0.55), late = Math.floor(bandCount * 0.78);
+    const pool = ['pegs', 'pegs', 'spinners', 'spinners', 'spinners', 'windmill', 'windmill', 'slopes', 'bumpers', 'sliders', 'funnel'].concat(lottery, lottery);
+    const bandCount = 11 + Math.floor(rng() * 3);
+    const at = f => Math.floor(bandCount * f);
+    const slotType = new Map([
+      [at(0.3), ['slam']], [at(0.45), ['portals']], [at(0.62), ['slam']], [at(0.78), lottery],
+      [bandCount - 2, ['slam']], [bandCount - 1, ['portals']]
+    ]);
     let y = SPAWN_H + 90;
     let last = '';
     const layout = [];
     for (let i = 0; i < bandCount; i++) {
-      let src = pool;
-      if (i === 0) src = ['pegs'];
-      else if (i === mid || i === bandCount - 1) src = ['portals'];          // decisive: shortcut / sent back / pass
-      else if (i === Math.floor(bandCount * 0.3) || i === late) src = lottery;
+      const src = i === 0 ? ['pegs'] : slotType.get(i) || pool;
       let cand = src.filter(t => t !== last || t === 'pegs');
       if (!cand.length) cand = ['pegs'];
       const type = cand[Math.floor(rng() * cand.length)];
       layout.push({ type, y });
-      const before = portals.length;
+      const before = portals.length, sBefore = slams.length;
       y += builders[type](y);
       for (let k = before; k < portals.length; k++) portals[k].band = i;
+      for (let k = sBefore; k < slams.length; k++) slams[k].band = i;
       last = type;
     }
     const finishY = y + 110;
+    for (const sl of slams) sl.destY = layout[Math.max(0, sl.band - 2 - Math.floor(rng() * 2))].y - 14;
     for (const p of portals) {
       const j = p.band, lastIdx = layout.length - 1;
       if (p.kind === 'fwd') {
@@ -310,7 +333,7 @@
         p.destY = layout[Math.max(0, j - 3 - Math.floor(rng() * 2))].y - 14;
       }
     }
-    return { W, H: finishY + 190, SPAWN_H, finishY, colliders, dynamic, zones, portals, layout, seed };
+    return { W, H: finishY + 190, SPAWN_H, finishY, colliders, dynamic, zones, portals, slams, layout, seed };
   }
 
   // ---------- game ----------
@@ -357,7 +380,7 @@
           x: x0 + (s % cols) * cell + (this.rng() - 0.5) * 2,
           y: y0 + Math.floor(s / cols) * cell + (this.rng() - 0.5) * 2,
           vx: (this.rng() - 0.5) * 120, vy: this.rng() * 40,
-          done: false, rank: 0, time: 0, stuck: 0, doneAt: 0, cd: 0, backs: 0, tele: null
+          done: false, rank: 0, time: 0, stuck: 0, doneAt: 0, cd: 0, backs: 0, tele: null, hit: {}, maxY: 0
         };
       });
       this.active = this.balls.slice();
@@ -391,6 +414,7 @@
           const f = MAX_SPEED / Math.sqrt(sp2); b.vx *= f; b.vy *= f;
         }
         b.x += b.vx * dt; b.y += b.vy * dt;
+        if (b.y > b.maxY) b.maxY = b.y;
       }
 
       // spatial hash for ball-ball
@@ -414,13 +438,34 @@
         for (const b of A) this._collideWorld(b);
       }
 
+      // slam pads: a ball entering while among the front-runners is knocked back to where the pack is
+      for (const sl of map.slams) {
+        const lead = Math.max(1, Math.ceil(A.length * sl.frac));
+        let ys = null;
+        for (const b of A) {
+          if (b.vy <= 0 || b.y < sl.y0 || b.y > sl.y1 || b.hit[sl.id]) continue;
+          let ahead = 0;                                            // rank by deepest point reached, so knocked-back balls keep their rank
+          for (const o of A) if (o.maxY > b.maxY) ahead++;
+          if (ahead >= lead) { b.hit[sl.id] = 2; continue; }     // not a leader: passes for good
+          b.hit[sl.id] = 1;
+          if (!ys) ys = A.map(o => o.y).sort((p, q) => q - p);
+          const median = ys[Math.floor(ys.length / 2)];
+          const target = Math.max(Math.min(median - this.rng() * 100, b.y - 150), b.y - 600);   // at most ~2-3 bands back
+          let dest = map.layout[0].y - 14;                         // snap to the top of a band: always open space
+          for (const l of map.layout) if (l.y - 14 <= target) dest = l.y - 14;
+          b.tele = { t: this.t, x: b.x, y: b.y, kind: 'slam' };
+          b.x = 40 + this.rng() * (W - 80); b.y = dest;
+          b.vx = (this.rng() - 0.5) * 120; b.vy = 40; b.stuck = 0;
+        }
+      }
+
       // portals
       if (map.portals.length) {
         for (const b of A) {
           if (b.cd > 0) { b.cd -= dt; continue; }
           for (const p of map.portals) {
             if (b.x < p.x0 || b.x > p.x1 || b.y < p.y0 || b.y > p.y1) continue;
-            if (p.kind === 'stay' || (p.kind === 'back' && b.backs >= 2)) break;
+            if (p.kind === 'stay' || (p.kind === 'back' && b.backs >= 1)) break;
             b.tele = { t: this.t, x: b.x, y: b.y };
             if (p.kind === 'back') b.backs++;
             b.x = 40 + this.rng() * (W - 80); b.y = p.destY;

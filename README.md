@@ -16,14 +16,17 @@
   - **Lanes**: 차선마다 통과 시간이 크게 다름 (자유낙하 / 지그재그 / 상승기류 / 주기적으로 열리는 게이트)
   - **Gates**: 일정 주기로 열리고 닫히는 문
   - **Wind**: 시간에 따라 켜지고 꺼지는 상승/횡풍
-  - **Portals**: 구멍마다 SKIP(앞 구간으로 순간이동) / BACK(뒤로 되돌림, 최대 2회) / PASS
+  - **Portals**: 구멍마다 색이 다름 — 초록: 앞 구간으로 순간이동, 빨강: 뒤로 되돌림, 파랑: 그냥 통과
+  - **Slam pad** (붉은 띠, 위로 흐르는 화살표): 선두권(약 35~50%)이 닿으면 무리의 중간 위치로 되돌려 보냅니다. 앞선 격차가 사라져 선두가 계속 선두인 현상을 막습니다. 순위는 "지금까지 도달한 최대 깊이"로 판정합니다.
 - 중반 순위가 얼마나 바뀌는지는 `node tests/metrics.js`, `node tests/lead.js`로 측정할 수 있습니다.
 
 ## 로컬 실행
 ```
-python3 -m http.server 8000   # 후 http://localhost:8000
+python3 serve.py 8000         # 캐시를 끈 로컬 서버, 후 http://localhost:8000
 node tests/sim.js             # 물리 엔진 헤드리스 테스트 (끼임/완주 확인)
 ```
+
+> 파일을 수정한 뒤 배포(GitHub Pages)할 때는 `index.html`의 `?v=` 숫자를 올리면 방문자의 브라우저 캐시가 갱신됩니다.
 
 ## GitHub Pages 배포
 저장소 Settings → Pages → Source: `Deploy from a branch` → 브랜치 선택, 폴더 `/ (root)`.
