@@ -84,7 +84,16 @@
     return Array.from(out).sort((x, y) => x - y);
   }
 
+  // Round-robin grouping by finishing rank: rank r goes to group ((r - 1) % groups) + 1
+  function groupOf(rank, groups) { return ((rank - 1) % groups) + 1; }
+  function buildGroups(ranking, groups) {
+    const out = Array.from({ length: groups }, () => []);
+    ranking.forEach((b, i) => out[groupOf(i + 1, groups)- 1].push({ rank: i + 1, ball: b }));
+    return out;
+  }
+
   function winnerRanks(mode, rangesText, n) {
+    if (mode === 'group') return [];            // groups have no single winners
     if (mode === 'first') return [1];
     if (mode === 'last') return [n];
     return parseRanges(rangesText, n);
@@ -583,7 +592,7 @@
   return {
     W, DT, MAX_BALLS, SPAWN_H,
     mulberry32, randomSeed, shuffle,
-    parseEntries, parseRanges, winnerRanks,
+    parseEntries, parseRanges, winnerRanks, groupOf, buildGroups,
     createMap, Game
   };
 });

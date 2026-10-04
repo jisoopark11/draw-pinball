@@ -60,7 +60,7 @@ textarea:focus, input:focus, select:focus, button:focus-visible { outline: 2px s
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; }
 .check input { margin-top: 4px; }
 
-.seg { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .seg label { cursor: pointer; position: relative; }
 .seg input { position: absolute; opacity: 0; pointer-events: none; }
 .seg span { display: block; text-align: center; padding: 7px 0; background: #12131a; border-right: 1px solid var(--line); }
@@ -102,7 +102,7 @@ canvas {
 .winners .card small { display: block; color: var(--accent2); font-weight: 600; letter-spacing: .06em; }
 .order { list-style: none; margin: 10px 0 0; padding: 0; counter-reset: none; }
 .order li {
-  display: grid; grid-template-columns: 34px 14px 1fr auto; gap: 6px; align-items: center;
+  display: grid; grid-template-columns: 34px 14px 1fr auto auto; gap: 6px; align-items: center;
   padding: 4px 6px; border-radius: 6px; font-size: 13px;
 }
 .order li:nth-child(odd) { background: #171925; }
@@ -122,3 +122,10 @@ canvas {
 .mini { margin-bottom: 12px; }
 .mini canvas { width: 100%; height: auto; aspect-ratio: auto; border-radius: 8px; background: #0b0c12; border: 1px solid var(--line); display: block; }
 .seg input:disabled { opacity: 0; }
+
+input[type=number] { width: 100%; background: #12131a; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; margin-top: 4px; }
+.order .gp { font-size: 11px; font-weight: 700; border: 1px solid currentColor; border-radius: 999px; padding: 0 7px; }
+.winners .card.group { background: #1c2030; border-color: var(--line); font-weight: 600; }
+.winners .card.group small { color: var(--muted); }
+.winners .card.group .mem { display: block; margin-top: 2px; font-weight: 600; line-height: 1.45; }
+.winners .card.group .mem i { color: var(--muted); font-style: normal; font-size: 12px; margin-right: 4px; }
