@@ -119,6 +119,12 @@
       dynamic.push(s);
       return s;
     }
+    function spinnerRow(cy, cnt) {
+      const spacing = W / cnt;
+      for (let k = 0; k < cnt; k++) {
+        spinner(spacing * (k + 0.5) + R(-10, 10), cy + R(-8, 8), spacing * 0.375, (rng() < 0.5 ? -1 : 1) * R(1.4, 3.2), R(0, Math.PI), 5);
+      }
+    }
     // door that blocks balls while closed and lets them through while open
     function gate(x0, x1, y, period, open) {
       const g = add(seg(x0, y, x1, y, 4, 0.3, { type: 'gate', off: false, period, open, phase: R(0, period) }));
@@ -205,7 +211,8 @@
       // pad that only reacts to the front-runners: they get knocked back up, everyone else passes through
       slam(y) {
         slams.push({ id: slams.length, y0: y + 36, y1: y + 70, frac: R(0.35, 0.5), destY: 0 });
-        for (let row = 0; row < 2; row++) {
+        if (rng() < 0.5) spinnerRow(y + 140, 3);
+        else for (let row = 0; row < 2; row++) {
           for (let x = (row ? 35 : 0) + 45; x < W - 20; x += 70) add(circle(x + R(-7, 7), y + 115 + row * 52 + R(-5, 5), R(4, 6.5), 0.55));
         }
         return 215;
@@ -222,25 +229,29 @@
         const period = R(2.5, 4), duty = R(0.45, 0.6);
         if (up) zone(0, y, W, y + h, 0, -GRAVITY * R(1.4, 2.2), period, duty);
         else zone(0, y, W, y + h, (rng() < 0.5 ? -1 : 1) * R(500, 900), 0, period, duty);
-        for (let row = 0; row < 3; row++) {
+        if (rng() < 0.5) spinnerRow(y + 115, 3);
+        else for (let row = 0; row < 3; row++) {
           for (let x = (row % 2 ? 30 : 0) + 45; x < W - 20; x += 80) add(circle(x + R(-8, 8), y + 40 + row * 70 + R(-6, 6), R(4, 6), 0.55));
         }
         return h + 30;
       },
       spinners(y) {
-        const cnt = 2 + Math.floor(rng() * 2);
-        const spacing = W / cnt;
-        for (let k = 0; k < cnt; k++) {
-          const cx = spacing * (k + 0.5) + R(-12, 12);
-          const cy = y + 60 + R(-8, 8);
-          const hl = spacing * 0.375;
-          const w = (rng() < 0.5 ? -1 : 1) * R(1.4, 3.2);
-          spinner(cx, cy, hl, w, R(0, Math.PI), 5);
+        const rows = rng() < 0.45 ? 2 : 1;                 // sometimes two staggered rows
+        for (let r = 0; r < rows; r++) {
+          const cnt = 2 + Math.floor(rng() * 2);
+          const spacing = W / cnt;
+          for (let k = 0; k < cnt; k++) {
+            const cx = spacing * (k + 0.5) + R(-12, 12);
+            const cy = y + 60 + r * 135 + R(-8, 8);
+            const hl = spacing * 0.375;
+            const w = (rng() < 0.5 ? -1 : 1) * R(1.4, 3.2);
+            spinner(cx, cy, hl, w, R(0, Math.PI), 5);
+          }
         }
-        return 125;
+        return 125 + (rows - 1) * 135;
       },
       slopes(y) {
-        const L = W * 0.7, drop = L * 0.2, step = 100;
+        const L = W * 0.66, drop = L * 0.3, step = 115;
         const n = 3;
         let left = rng() < 0.5;
         for (let i = 0; i < n; i++) {
@@ -290,8 +301,8 @@
 
     // "lottery" bands make travel time vary wildly between balls, so ranks keep reshuffling
     const lottery = ['lanes', 'gates', 'wind'];
-    const pool = ['pegs', 'pegs', 'spinners', 'windmill', 'slopes', 'bumpers', 'sliders', 'funnel'].concat(lottery, lottery);
-    const bandCount = 9 + Math.floor(rng() * 4);
+    const pool = ['pegs', 'pegs', 'spinners', 'spinners', 'spinners', 'windmill', 'windmill', 'slopes', 'bumpers', 'sliders', 'funnel'].concat(lottery, lottery);
+    const bandCount = 11 + Math.floor(rng() * 3);
     const at = f => Math.floor(bandCount * f);
     const slotType = new Map([
       [at(0.3), ['slam']], [at(0.45), ['portals']], [at(0.62), ['slam']], [at(0.78), lottery],
@@ -439,7 +450,7 @@
           b.hit[sl.id] = 1;
           if (!ys) ys = A.map(o => o.y).sort((p, q) => q - p);
           const median = ys[Math.floor(ys.length / 2)];
-          const target = Math.min(median - this.rng() * 100, b.y - 150);
+          const target = Math.max(Math.min(median - this.rng() * 100, b.y - 150), b.y - 600);   // at most ~2-3 bands back
           let dest = map.layout[0].y - 14;                         // snap to the top of a band: always open space
           for (const l of map.layout) if (l.y - 14 <= target) dest = l.y - 14;
           b.tele = { t: this.t, x: b.x, y: b.y, kind: 'slam' };
